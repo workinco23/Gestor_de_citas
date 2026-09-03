@@ -1,0 +1,179 @@
+// Aurora Beauty Lounge — Prisma schema
+// Sigue el esquema definido en PRD_AuroraBeautyLounge.md, sección 4.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  customer
+  staff
+  admin
+  reception
+}
+
+enum ServiceCategory {
+  unas
+  pestanas
+  cejas
+  otro
+}
+
+enum AppointmentStatus {
+  pending
+  confirmed
+  completed
+  cancelled
+  no_show
+}
+
+enum PaymentStatus {
+  unpaid
+  partial
+  paid
+}
+
+enum AppointmentSource {
+  app_cliente
+  admin_manual
+}
+
+enum PaymentMethod {
+  cash
+  yape
+  plin
+  card
+}
+
+model User {
+  id        String   @id @default(uuid())
+  phone     String   @unique
+  email     String?
+  fullName  String   @map("full_name")
+  role      UserRole @default(customer)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  staffProfile StaffProfile?
+  appointments Appointment[]
+
+  @@map("users")
+}
+
+model StaffProfile {
+  id          String  @id @default(uuid())
+  userId      String  @unique @map("user_id")
+  user        User    @relation(fields: [userId], references: [id])
+  displayName String  @map("display_name")
+  colorHex    String  @map("color_hex")
+  active      Boolean @default(true)
+
+  services     StaffService[]
+  schedules    StaffSchedule[]
+  exceptions   StaffScheduleException[]
+  appointments Appointment[]
+
+  @@map("staff_profiles")
+}
+
+model Service {
+  id              String          @id @default(uuid())
+  category        ServiceCategory
+  name            String
+  description     String?
+  durationMinutes Int             @map("duration_minutes")
+  priceCents      Int             @map("price_cents")
+  imageUrl        String?         @map("image_url")
+  active          Boolean         @default(true)
+
+  staff               StaffService[]
+  appointmentServices AppointmentService[]
+
+  @@map("services")
+}
+
+model StaffService {
+  staffId   String       @map("staff_id")
+  staff     StaffProfile @relation(fields: [staffId], references: [id])
+  serviceId String       @map("service_id")
+  service   Service      @relation(fields: [serviceId], references: [id])
+
+  @@id([staffId, serviceId])
+  @@map("staff_services")
+}
+
+model StaffSchedule {
+  id        String       @id @default(uuid())
+  staffId   String       @map("staff_id")
+  staff     StaffProfile @relation(fields: [staffId], references: [id])
+  weekday   Int // 0 = domingo ... 6 = sábado
+  startTime String       @map("start_time") // "HH:mm", hora local Lima
+  endTime   String       @map("end_time")
+
+  @@map("staff_schedules")
+}
+
+model StaffScheduleException {
+  id        String       @id @default(uuid())
+  staffId   String       @map("staff_id")
+  staff     StaffProfile @relation(fields: [staffId], references: [id])
+  date      DateTime     @db.Date
+  startTime String?      @map("start_time") // null = bloquea el día completo
+  endTime   String?      @map("end_time")
+  reason    String?
+
+  @@map("staff_schedule_exceptions")
+}
+
+model Appointment {
+  id             String            @id @default(uuid())
+  customerId     String            @map("customer_id")
+  customer       User              @relation(fields: [customerId], references: [id])
+  staffId        String            @map("staff_id")
+  staff          StaffProfile      @relation(fields: [staffId], references: [id])
+  startsAt       DateTime          @map("starts_at") // UTC
+  endsAt         DateTime          @map("ends_at") // UTC
+  status         AppointmentStatus @default(pending)
+  paymentStatus  PaymentStatus     @default(unpaid) @map("payment_status")
+  createdVia     AppointmentSource @default(app_cliente) @map("created_via")
+  notes          String?
+  createdAt      DateTime          @default(now()) @map("created_at")
+
+  services AppointmentService[]
+  payments Payment[]
+
+  @@index([staffId, startsAt])
+  @@map("appointments")
+  // NOTA: agregar en una migración manual el constraint de exclusión de solapamiento:
+  // ALTER TABLE appointments ADD CONSTRAINT no_overlapping_appointments
+  //   EXCLUDE USING gist (staff_id WITH =, tstzrange(starts_at, ends_at) WITH &&)
+  //   WHERE (status != 'cancelled');
+  // Prisma no soporta EXCLUDE nativamente — se agrega vía prisma migrate + SQL manual.
+}
+
+model AppointmentService {
+  appointmentId       String      @map("appointment_id")
+  appointment         Appointment @relation(fields: [appointmentId], references: [id])
+  serviceId           String      @map("service_id")
+  service              Service    @relation(fields: [serviceId], references: [id])
+  priceCentsAtBooking Int         @map("price_cents_at_booking")
+
+  @@id([appointmentId, serviceId])
+  @@map("appointment_services")
+}
+
+model Payment {
+  id                 String        @id @default(uuid())
+  appointmentId      String        @map("appointment_id")
+  appointment        Appointment   @relation(fields: [appointmentId], references: [id])
+  amountCents        Int           @map("amount_cents")
+  method             PaymentMethod
+  providerReference  String?       @map("provider_reference")
+  paidAt             DateTime      @default(now()) @map("paid_at")
+
+  @@map("payments")
+}

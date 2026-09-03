@@ -1,0 +1,22 @@
+{
+  "name": "aurora-beauty-lounge",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "db:generate": "npm run generate --workspace=@aurora/database",
+    "db:migrate": "npm run migrate --workspace=@aurora/database",
+    "db:seed": "npm run seed --workspace=@aurora/database"
+  },
+  "devDependencies": {
+    "turbo": "^2.1.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
