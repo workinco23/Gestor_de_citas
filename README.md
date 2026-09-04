@@ -2,6 +2,9 @@
 
 Sistema de gestión de citas para el centro estético Aurora Beauty Lounge. Ver [`../PRD_AuroraBeautyLounge.md`](../PRD_AuroraBeautyLounge.md) para la arquitectura y el PRD completos.
 
+Repositorio: https://github.com/workinco23/Gestor_de_citas
+Base de datos: proyecto Supabase "Gestor_de_citas"
+
 ## Estructura
 
 ```
@@ -45,15 +48,15 @@ npm run db:migrate -- --name init
 npm run db:seed
 ```
 
-La migración inicial **no** incluye todavía el `EXCLUDE` constraint de Postgres que impide citas solapadas a nivel de base de datos (Prisma no lo soporta de forma nativa). Después de la primera migración, agregar manualmente:
+**Importante:** las columnas de fecha (`starts_at`, `ends_at`, `created_at`, `paid_at`) deben quedar como `TIMESTAMPTZ`, no `TIMESTAMP` — por eso el schema usa `@db.Timestamptz(3)` en esos campos. Si se agrega un nuevo campo `DateTime` que represente un instante (no una fecha de calendario), agregar el mismo atributo.
 
-```sql
-ALTER TABLE appointments ADD CONSTRAINT no_overlapping_appointments
-  EXCLUDE USING gist (staff_id WITH =, tstzrange(starts_at, ends_at) WITH &&)
-  WHERE (status != 'cancelled');
+El `EXCLUDE` constraint de Postgres que impide citas solapadas a nivel de base de datos no lo soporta Prisma de forma nativa, así que se aplica a mano una sola vez después de la migración inicial:
+
+```bash
+npx prisma db execute --file prisma/manual/001_exclude_overlapping_appointments.sql --schema prisma/schema.prisma
 ```
 
-(requiere la extensión `btree_gist`: `CREATE EXTENSION IF NOT EXISTS btree_gist;`)
+(ejecutar desde `packages/database/`; ya está aplicado en la base de Supabase del proyecto — este paso solo hace falta al levantar una base nueva, ej. para otro entorno)
 
 ### 5. Levantar todo en desarrollo
 
@@ -72,7 +75,6 @@ Esto levanta con Turborepo:
 ## Pendientes conocidos (antes de producción)
 
 - **Autenticación real de clientes**: hoy el endpoint `POST /api/customers/upsert-by-phone` identifica/crea clientes por número de celular sin verificación (OTP). Reemplazar por autenticación real (OTP por SMS/WhatsApp) antes de ir a producción — ver PRD sección 2.1.
-- **Constraint `EXCLUDE` de Postgres**: agregar manualmente tras la primera migración (ver arriba). Sin este constraint, la única defensa contra citas duplicadas es la revalidación dentro de la transacción de `AppointmentsService.create`.
 - **Lock temporal de slots (Redis)**: el PRD prevé apartar un slot ~5 min mientras el cliente completa el pago; no implementado todavía.
 - **Pagos (Culqi/Yape)**: solo existe el modelo `Payment` en el schema; falta la integración con la pasarela.
 - **Notificaciones WhatsApp (Twilio)**: no implementado todavía.

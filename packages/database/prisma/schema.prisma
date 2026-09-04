@@ -6,8 +6,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum UserRole {
@@ -56,7 +57,7 @@ model User {
   email     String?
   fullName  String   @map("full_name")
   role      UserRole @default(customer)
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
   staffProfile StaffProfile?
   appointments Appointment[]
@@ -135,13 +136,13 @@ model Appointment {
   customer       User              @relation(fields: [customerId], references: [id])
   staffId        String            @map("staff_id")
   staff          StaffProfile      @relation(fields: [staffId], references: [id])
-  startsAt       DateTime          @map("starts_at") // UTC
-  endsAt         DateTime          @map("ends_at") // UTC
+  startsAt       DateTime          @map("starts_at") @db.Timestamptz(3) // UTC
+  endsAt         DateTime          @map("ends_at") @db.Timestamptz(3) // UTC
   status         AppointmentStatus @default(pending)
   paymentStatus  PaymentStatus     @default(unpaid) @map("payment_status")
   createdVia     AppointmentSource @default(app_cliente) @map("created_via")
   notes          String?
-  createdAt      DateTime          @default(now()) @map("created_at")
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
 
   services AppointmentService[]
   payments Payment[]
@@ -173,7 +174,7 @@ model Payment {
   amountCents        Int           @map("amount_cents")
   method             PaymentMethod
   providerReference  String?       @map("provider_reference")
-  paidAt             DateTime      @default(now()) @map("paid_at")
+  paidAt             DateTime      @default(now()) @map("paid_at") @db.Timestamptz(3)
 
   @@map("payments")
 }
