@@ -1,6 +1,7 @@
 {
   "name": "aurora-beauty-lounge",
   "private": true,
+  "packageManager": "npm@12.0.2",
   "workspaces": [
     "apps/*",
     "packages/*"

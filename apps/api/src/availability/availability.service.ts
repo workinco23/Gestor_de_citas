@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { fromZonedTime } from 'date-fns-tz';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { SlotHoldsService } from './slot-holds.service.js';
 
 const TIMEZONE = 'America/Lima';
 const SLOT_STEP_MINUTES = 15;
@@ -26,7 +27,10 @@ function limaLocalToUtc(date: string, hhmm: string): Date {
 
 @Injectable()
 export class AvailabilityService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly slotHolds: SlotHoldsService,
+  ) {}
 
   async getAvailableSlots({ staffId, serviceIds, date }: AvailabilityParams) {
     const staff = await this.prisma.staffProfile.findUnique({ where: { id: staffId } });
@@ -87,7 +91,9 @@ export class AvailabilityService {
           return slotStart < excEnd && slotEnd > excStart;
         });
 
-        if (!overlapsAppointment && !overlapsException) {
+        const isHeld = this.slotHolds.isHeld(staffId, slotStart.toISOString());
+
+        if (!overlapsAppointment && !overlapsException && !isHeld) {
           slots.push({ startsAt: slotStart.toISOString(), endsAt: slotEnd.toISOString() });
         }
 

@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AppointmentsGateway } from './appointments.gateway.js';
+import { SlotHoldsService } from '../availability/slot-holds.service.js';
 import type { CreateAppointmentDto } from './dto/create-appointment.dto.js';
 import type { AppointmentStatus, PaymentStatus } from '@aurora/database';
 
@@ -9,6 +10,7 @@ export class AppointmentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly gateway: AppointmentsGateway,
+    private readonly slotHolds: SlotHoldsService,
   ) {}
 
   async findAll(params: { date?: string; staffId?: string }) {
@@ -75,6 +77,7 @@ export class AppointmentsService {
         include: { services: { include: { service: true } }, customer: true, staff: true },
       });
 
+      this.slotHolds.release(dto.staffId, startsAt.toISOString());
       this.gateway.emitAppointmentCreated(appointment);
       return appointment;
     });

@@ -8,6 +8,8 @@ import {
   fetchServices,
   fetchStaff,
   formatSoles,
+  holdSlot,
+  releaseSlot,
   upsertCustomerByPhone,
   type AvailabilitySlot,
   type ServiceDTO,
@@ -231,7 +233,10 @@ export default function Home() {
                 <span className="font-semibold text-gray-800">{formatSoles(totalCents)}</span>
               </div>
               <button
-                onClick={() => setStep("checkout")}
+                onClick={() => {
+                  if (staffId) holdSlot({ staffId, startsAt: selectedSlot.startsAt });
+                  setStep("checkout");
+                }}
                 className="w-full rounded-xl bg-burdeos py-3 font-semibold text-white hover:bg-burdeos-dark"
               >
                 CONTINUAR
@@ -243,7 +248,13 @@ export default function Home() {
 
       {step === "checkout" && (
         <section className="flex flex-col gap-4 px-4 pt-6">
-          <button onClick={() => setStep("services")} className="w-fit text-sm text-gray-400">
+          <button
+            onClick={() => {
+              if (staffId && selectedSlot) releaseSlot({ staffId, startsAt: selectedSlot.startsAt });
+              setStep("services");
+            }}
+            className="w-fit text-sm text-gray-400"
+          >
             ← Volver
           </button>
           <h2 className="text-lg font-semibold text-gray-800">Confirmar reserva</h2>

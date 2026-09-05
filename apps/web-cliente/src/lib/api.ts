@@ -50,6 +50,22 @@ export async function fetchAvailability(params: {
   return res.json();
 }
 
+export async function holdSlot(params: { staffId: string; startsAt: string }): Promise<{ expiresAt: string }> {
+  const res = await fetch(`${API_URL}/api/availability/hold`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) throw new Error("No se pudo apartar el horario");
+  return res.json();
+}
+
+export function releaseSlot(params: { staffId: string; startsAt: string }): void {
+  const query = new URLSearchParams(params);
+  // fire-and-forget: si falla, el hold igual expira solo a los 5 minutos.
+  fetch(`${API_URL}/api/availability/hold?${query}`, { method: "DELETE" }).catch(() => {});
+}
+
 export async function upsertCustomerByPhone(body: { phone: string; fullName: string }): Promise<{ id: string }> {
   const res = await fetch(`${API_URL}/api/customers/upsert-by-phone`, {
     method: "POST",
