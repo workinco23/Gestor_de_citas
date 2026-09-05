@@ -27,9 +27,9 @@ packages/
    - La cadena **directa** (puerto 5432) → `DIRECT_URL` (Prisma la necesita para migraciones)
 3. Copiar `.env.example` a `.env` en la raíz y completar ambas URLs (con la contraseña real del proyecto).
 
-### 2. Redis (opcional en esta etapa)
+### 2. Redis (no hace falta todavía)
 
-El lock temporal de slots durante checkout todavía no está implementado (ver sección "Pendientes" abajo); Redis no es necesario para levantar el sistema hoy. Cuando se implemente, usar [Upstash](https://upstash.com) (plan gratuito).
+El lock temporal de slots durante checkout (`POST/DELETE /api/availability/hold`) está implementado en memoria dentro de `SlotHoldsService` — funciona bien con una sola instancia de la API. No requiere Redis hoy. Si el sistema escala a múltiples instancias del API, reemplazar ese Map por Redis (`SET key EX 300 NX`), por ejemplo con [Upstash](https://upstash.com) (plan gratuito) — la interfaz del servicio no debería cambiar.
 
 ### 3. Instalar dependencias
 
@@ -75,7 +75,6 @@ Esto levanta con Turborepo:
 ## Pendientes conocidos (antes de producción)
 
 - **Autenticación real de clientes**: hoy el endpoint `POST /api/customers/upsert-by-phone` identifica/crea clientes por número de celular sin verificación (OTP). Reemplazar por autenticación real (OTP por SMS/WhatsApp) antes de ir a producción — ver PRD sección 2.1.
-- **Lock temporal de slots (Redis)**: el PRD prevé apartar un slot ~5 min mientras el cliente completa el pago; no implementado todavía.
 - **Pagos (Culqi/Yape)**: solo existe el modelo `Payment` en el schema; falta la integración con la pasarela.
 - **Notificaciones WhatsApp (Twilio)**: no implementado todavía.
 - **Roles y permisos**: el dashboard no tiene login todavía; toda la agenda es de acceso libre en local.
