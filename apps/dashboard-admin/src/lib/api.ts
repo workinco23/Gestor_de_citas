@@ -72,6 +72,7 @@ export interface AdminUser {
   email: string;
   fullName: string;
   role: string;
+  staffProfileId?: string;
 }
 
 export const adminLogin = (email: string, password: string) =>
@@ -89,6 +90,14 @@ export const fetchAppointments = (date: string, token?: string) =>
   fetch(`${API_URL}/api/appointments?date=${date}`, { headers: authHeaders(token) }).then((r) =>
     json<AppointmentDTO[]>(r),
   );
+
+export const fetchAppointmentsRange = (from: string, to: string, token?: string, staffId?: string) => {
+  const query = new URLSearchParams({ from, to });
+  if (staffId) query.set("staffId", staffId);
+  return fetch(`${API_URL}/api/appointments?${query}`, { headers: authHeaders(token) }).then((r) =>
+    json<AppointmentDTO[]>(r),
+  );
+};
 
 export const fetchAvailability = (params: { staffId: string; serviceIds: string[]; date: string }) => {
   const query = new URLSearchParams({

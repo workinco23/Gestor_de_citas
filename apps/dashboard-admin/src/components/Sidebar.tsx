@@ -1,14 +1,27 @@
 const NAV_ITEMS = ["Agenda", "Desempeño", "Especialistas", "Servicios", "Clientes", "Configuración"];
+const STAFF_NAV_ITEMS = ["Agenda"];
 
-export function Sidebar({ onLogout }: { onLogout?: () => void }) {
+export function Sidebar({
+  onLogout,
+  minimal,
+  subtitle,
+}: {
+  onLogout?: () => void;
+  /** Vista de especialista: solo muestra "Agenda", sin los demás ítems placeholder. */
+  minimal?: boolean;
+  /** Texto bajo el nombre del negocio (ej. "Sucursal Miraflores" o el nombre de la especialista). */
+  subtitle?: string;
+}) {
+  const items = minimal ? STAFF_NAV_ITEMS : NAV_ITEMS;
+
   return (
     <nav className="flex w-56 shrink-0 flex-col bg-navy text-white">
       <div className="px-5 py-6">
         <p className="text-lg font-semibold">Aurora Beauty</p>
-        <p className="text-xs text-white/50">Lounge — Admin</p>
+        <p className="text-xs text-white/50">{subtitle ?? "Lounge — Admin"}</p>
       </div>
       <ul className="flex flex-1 flex-col gap-1 px-3">
-        {NAV_ITEMS.map((item, i) => (
+        {items.map((item, i) => (
           <li key={item}>
             <button
               className={`w-full rounded-lg px-3 py-2 text-left text-sm transition ${
