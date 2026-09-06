@@ -158,6 +158,8 @@ model Appointment {
   createdVia     AppointmentSource @default(app_cliente) @map("created_via")
   notes          String?
   createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  reminder24hSentAt DateTime?      @map("reminder_24h_sent_at") @db.Timestamptz(3)
+  reminder2hSentAt  DateTime?      @map("reminder_2h_sent_at") @db.Timestamptz(3)
 
   services AppointmentService[]
   payments Payment[]

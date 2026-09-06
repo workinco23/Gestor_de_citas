@@ -1,7 +1,7 @@
 import { HttpException, HttpStatus, Injectable, UnauthorizedException } from '@nestjs/common';
 import { createHash, randomInt } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { WhatsappService } from './whatsapp.service.js';
+import { WhatsappService } from '../notifications/whatsapp.service.js';
 
 const OTP_TTL_MS = 5 * 60_000;
 const MIN_SECONDS_BETWEEN_REQUESTS = 45;

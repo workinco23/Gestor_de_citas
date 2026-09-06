@@ -27,4 +27,18 @@ export class CreateAppointmentDto {
 
   @IsIn(['app_cliente', 'admin_manual'])
   createdVia!: 'app_cliente' | 'admin_manual';
+
+  /**
+   * Sin pasarela de pago: si el cliente elige "yape" o "plin", declara que ya
+   * envió (o va a enviar) el adelanto al número del local — recepción lo
+   * confirma manualmente viendo que llegó la plata. "cash" o ausente = paga
+   * en el local, sin acción inmediata sobre el estado de pago.
+   */
+  @IsOptional()
+  @IsIn(['cash', 'yape', 'plin'])
+  paymentMethod?: 'cash' | 'yape' | 'plin';
+
+  @IsOptional()
+  @IsString()
+  paymentReference?: string;
 }

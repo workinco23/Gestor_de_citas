@@ -4,9 +4,18 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { AppointmentsGateway } from './appointments.gateway.js';
 import { SlotHoldsService } from '../availability/slot-holds.service.js';
 import { extractBearerToken } from '../auth/jwt-auth.guard.js';
+import { WhatsappService } from '../notifications/whatsapp.service.js';
+import { cancellationMessage, confirmationMessage, paymentInstructionsNote } from '../notifications/templates.js';
 import type { JwtPayload } from '../auth/auth.service.js';
 import type { CreateAppointmentDto } from './dto/create-appointment.dto.js';
 import type { AppointmentStatus, PaymentStatus } from '@aurora/database';
+
+const APPOINTMENT_INCLUDE = {
+  services: { include: { service: true } },
+  customer: true,
+  staff: true,
+  payments: true,
+} as const;
 
 @Injectable()
 export class AppointmentsService {
@@ -15,6 +24,7 @@ export class AppointmentsService {
     private readonly gateway: AppointmentsGateway,
     private readonly slotHolds: SlotHoldsService,
     private readonly jwt: JwtService,
+    private readonly whatsapp: WhatsappService,
   ) {}
 
   /**
@@ -60,7 +70,7 @@ export class AppointmentsService {
             }
           : {}),
       },
-      include: { services: { include: { service: true } }, customer: true, staff: true },
+      include: APPOINTMENT_INCLUDE,
       orderBy: { startsAt: 'asc' },
     });
   }
@@ -78,11 +88,14 @@ export class AppointmentsService {
     const startsAt = new Date(dto.startsAt);
     const endsAt = new Date(startsAt.getTime() + totalDurationMinutes * 60_000);
 
+    const depositCents = Number(process.env.PAYMENT_DEPOSIT_CENTS ?? 2000);
+    const hasDeclaredDeposit = dto.paymentMethod === 'yape' || dto.paymentMethod === 'plin';
+
     // Revalidación de disponibilidad dentro de la transacción para cerrar la
     // ventana de condición de carrera entre GET /availability y este POST.
     // La defensa final (a nivel de BD) es el EXCLUDE constraint descrito en
     // schema.prisma; esto además da un error de negocio legible al cliente.
-    return this.prisma.$transaction(async (tx) => {
+    const appointment = await this.prisma.$transaction(async (tx) => {
       const overlapping = await tx.appointment.findFirst({
         where: {
           staffId: dto.staffId,
@@ -95,7 +108,7 @@ export class AppointmentsService {
         throw new ConflictException('El horario seleccionado ya no está disponible');
       }
 
-      const appointment = await tx.appointment.create({
+      const created = await tx.appointment.create({
         data: {
           customerId,
           staffId: dto.staffId,
@@ -103,28 +116,62 @@ export class AppointmentsService {
           endsAt,
           notes: dto.notes,
           createdVia: dto.createdVia,
+          // El cliente declara que envió el adelanto; recepción lo confirma
+          // manualmente en el dashboard al ver que llegó la plata (no hay
+          // pasarela: ver PaymentInfoController y el pendiente de "Pagos").
+          paymentStatus: hasDeclaredDeposit ? 'partial' : 'unpaid',
           services: {
             create: services.map((s) => ({
               serviceId: s.id,
               priceCentsAtBooking: s.priceCents,
             })),
           },
+          ...(hasDeclaredDeposit
+            ? {
+                payments: {
+                  create: {
+                    amountCents: depositCents,
+                    method: dto.paymentMethod as 'yape' | 'plin',
+                    providerReference: dto.paymentReference || null,
+                  },
+                },
+              }
+            : {}),
         },
-        include: { services: { include: { service: true } }, customer: true, staff: true },
+        include: APPOINTMENT_INCLUDE,
       });
 
       this.slotHolds.release(dto.staffId, startsAt.toISOString());
-      this.gateway.emitAppointmentCreated(appointment);
-      return appointment;
+      return created;
     });
+
+    this.gateway.emitAppointmentCreated(appointment);
+
+    const paymentNote =
+      appointment.paymentStatus === 'unpaid'
+        ? paymentInstructionsNote(
+            (depositCents / 100).toFixed(0),
+            process.env.PAYMENT_YAPE_PLIN_PHONE ?? '',
+            process.env.PAYMENT_YAPE_PLIN_HOLDER ?? '',
+          )
+        : 'Recibimos tu aviso de adelanto — lo vamos a confirmar antes de tu cita. ¡Gracias!';
+    void this.whatsapp.sendMessage(appointment.customer.phone, confirmationMessage(appointment, paymentNote));
+
+    return appointment;
   }
 
   async updateStatus(id: string, status: AppointmentStatus) {
     const appointment = await this.prisma.appointment.update({
       where: { id },
       data: { status },
+      include: APPOINTMENT_INCLUDE,
     });
     this.gateway.emitAppointmentUpdated(appointment);
+
+    if (status === 'cancelled') {
+      void this.whatsapp.sendMessage(appointment.customer.phone, cancellationMessage(appointment));
+    }
+
     return appointment;
   }
 
@@ -132,6 +179,7 @@ export class AppointmentsService {
     const appointment = await this.prisma.appointment.update({
       where: { id },
       data: { paymentStatus },
+      include: APPOINTMENT_INCLUDE,
     });
     this.gateway.emitAppointmentUpdated(appointment);
     return appointment;
