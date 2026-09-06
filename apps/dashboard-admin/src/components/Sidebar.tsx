@@ -1,6 +1,6 @@
 const NAV_ITEMS = ["Agenda", "Desempeño", "Especialistas", "Servicios", "Clientes", "Configuración"];
 
-export function Sidebar() {
+export function Sidebar({ onLogout }: { onLogout?: () => void }) {
   return (
     <nav className="flex w-56 shrink-0 flex-col bg-navy text-white">
       <div className="px-5 py-6">
@@ -20,7 +20,14 @@ export function Sidebar() {
           </li>
         ))}
       </ul>
-      <div className="border-t border-white/10 px-5 py-4 text-xs text-white/50">Sucursal Miraflores</div>
+      <div className="border-t border-white/10 px-5 py-4 text-xs text-white/50">
+        <p>Sucursal Miraflores</p>
+        {onLogout && (
+          <button onClick={onLogout} className="mt-2 text-white/70 hover:text-white hover:underline">
+            Cerrar sesión
+          </button>
+        )}
+      </div>
     </nav>
   );
 }

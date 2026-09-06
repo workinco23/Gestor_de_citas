@@ -36,20 +36,48 @@ export interface AvailabilitySlot {
   endsAt: string;
 }
 
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const err = await res.json().catch(() => null);
-    throw new Error(err?.message ?? `Error ${res.status}`);
+    throw new ApiError(err?.message ?? `Error ${res.status}`, res.status);
   }
   return res.json();
 }
+
+function authHeaders(token?: string): Record<string, string> {
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  fullName: string;
+  role: string;
+}
+
+export const adminLogin = (email: string, password: string) =>
+  fetch(`${API_URL}/api/auth/admin/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  }).then((r) => json<{ token: string; user: AdminUser }>(r));
 
 export const fetchServices = () => fetch(`${API_URL}/api/services`).then((r) => json<ServiceDTO[]>(r));
 
 export const fetchStaff = () => fetch(`${API_URL}/api/staff`).then((r) => json<StaffDTO[]>(r));
 
-export const fetchAppointments = (date: string) =>
-  fetch(`${API_URL}/api/appointments?date=${date}`).then((r) => json<AppointmentDTO[]>(r));
+export const fetchAppointments = (date: string, token?: string) =>
+  fetch(`${API_URL}/api/appointments?date=${date}`, { headers: authHeaders(token) }).then((r) =>
+    json<AppointmentDTO[]>(r),
+  );
 
 export const fetchAvailability = (params: { staffId: string; serviceIds: string[]; date: string }) => {
   const query = new URLSearchParams({
@@ -60,30 +88,33 @@ export const fetchAvailability = (params: { staffId: string; serviceIds: string[
   return fetch(`${API_URL}/api/availability?${query}`).then((r) => json<AvailabilitySlot[]>(r));
 };
 
-export const upsertCustomerByPhone = (body: { phone: string; fullName: string }) =>
+export const upsertCustomerByPhone = (body: { phone: string; fullName: string }, token?: string) =>
   fetch(`${API_URL}/api/customers/upsert-by-phone`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders(token) },
     body: JSON.stringify(body),
   }).then((r) => json<{ id: string }>(r));
 
-export const createAppointment = (body: {
-  customerId: string;
-  staffId: string;
-  serviceIds: string[];
-  startsAt: string;
-  createdVia: "admin_manual";
-}) =>
+export const createAppointment = (
+  body: {
+    customerId: string;
+    staffId: string;
+    serviceIds: string[];
+    startsAt: string;
+    createdVia: "admin_manual";
+  },
+  token?: string,
+) =>
   fetch(`${API_URL}/api/appointments`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders(token) },
     body: JSON.stringify(body),
   }).then((r) => json<AppointmentDTO>(r));
 
-export const updateAppointmentStatus = (id: string, status: AppointmentStatus) =>
+export const updateAppointmentStatus = (id: string, status: AppointmentStatus, token?: string) =>
   fetch(`${API_URL}/api/appointments/${id}/status`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders(token) },
     body: JSON.stringify({ status }),
   }).then((r) => json<AppointmentDTO>(r));
 

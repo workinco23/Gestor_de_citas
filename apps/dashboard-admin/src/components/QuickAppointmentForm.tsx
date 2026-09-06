@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
+  ApiError,
   createAppointment,
   fetchAvailability,
   formatSoles,
@@ -16,12 +17,16 @@ export function QuickAppointmentForm({
   services,
   staff,
   date,
+  token,
   onCreated,
+  onSessionExpired,
 }: {
   services: ServiceDTO[];
   staff: StaffDTO[];
   date: string;
+  token: string;
   onCreated: () => void;
+  onSessionExpired: () => void;
 }) {
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
@@ -52,14 +57,17 @@ export function QuickAppointmentForm({
     setSubmitting(true);
     setError(null);
     try {
-      const customer = await upsertCustomerByPhone({ phone, fullName });
-      await createAppointment({
-        customerId: customer.id,
-        staffId,
-        serviceIds,
-        startsAt: selectedSlot,
-        createdVia: "admin_manual",
-      });
+      const customer = await upsertCustomerByPhone({ phone, fullName }, token);
+      await createAppointment(
+        {
+          customerId: customer.id,
+          staffId,
+          serviceIds,
+          startsAt: selectedSlot,
+          createdVia: "admin_manual",
+        },
+        token,
+      );
       setFullName("");
       setPhone("");
       setStaffId("");
@@ -67,6 +75,10 @@ export function QuickAppointmentForm({
       setSelectedSlot(null);
       onCreated();
     } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        onSessionExpired();
+        return;
+      }
       setError(e instanceof Error ? e.message : "No se pudo crear la cita");
     } finally {
       setSubmitting(false);
