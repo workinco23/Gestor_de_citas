@@ -72,9 +72,16 @@ Esto levanta con Turborepo:
 - `dashboard-admin` → http://localhost:3102
 - `api` → http://localhost:3103/api
 
+**Nota Windows:** si arrancás los tres con `npm run dev` desde una sesión de Bash/Claude Code, el proceso muere apenas termina esa sesión (el `&`/`disown` de Bash no desengancha de verdad el proceso en Windows). Para dejarlo corriendo de forma independiente, lanzarlo con PowerShell `Start-Process` envolviendo `cmd.exe`, no con Bash en segundo plano.
+
+### 6. Autenticación de clientes (OTP por WhatsApp)
+
+La app cliente pide un código de 6 dígitos por WhatsApp (`POST /api/auth/otp/request`), lo verifica (`POST /api/auth/otp/verify`) y recibe un JWT de 30 días que se guarda en `localStorage`. Sin `TWILIO_ACCOUNT_SID`/`TWILIO_AUTH_TOKEN` configurados, el código no se envía por WhatsApp real: se loguea en la consola del API y además se devuelve como `devCode` en la respuesta de `otp/request`, para poder probar el flujo completo en local sin cuenta de Twilio. La UI de `web-cliente` muestra ese `devCode` con una etiqueta "Modo desarrollo" cuando está presente — dejará de aparecer solo en cuanto se configuren las credenciales de Twilio en `.env`.
+
+`POST /api/appointments` con `createdVia: "app_cliente"` ahora exige el header `Authorization: Bearer <token>` — el `customerId` se toma del JWT, nunca del body. El endpoint `POST /api/customers/upsert-by-phone` sigue existiendo pero solo lo usa el panel admin (reservas manuales de recepción), no la app del cliente.
+
 ## Pendientes conocidos (antes de producción)
 
-- **Autenticación real de clientes**: hoy el endpoint `POST /api/customers/upsert-by-phone` identifica/crea clientes por número de celular sin verificación (OTP). Reemplazar por autenticación real (OTP por SMS/WhatsApp) antes de ir a producción — ver PRD sección 2.1.
 - **Pagos (Culqi/Yape)**: solo existe el modelo `Payment` en el schema; falta la integración con la pasarela.
 - **Notificaciones WhatsApp (Twilio)**: no implementado todavía.
 - **Roles y permisos**: el dashboard no tiene login todavía; toda la agenda es de acceso libre en local.
