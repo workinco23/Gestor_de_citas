@@ -1,6 +1,7 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { UpsertCustomerDto } from './dto/upsert-customer.dto.js';
+import { AdminAuthGuard } from '../auth/admin-auth.guard.js';
 
 @Controller('customers')
 export class CustomersController {
@@ -9,15 +10,11 @@ export class CustomersController {
   /**
    * Usado únicamente por el panel admin (recepción registrando una cita
    * manual por teléfono/WhatsApp/presencial) — ver QuickAppointmentForm en
-   * dashboard-admin. El flujo de reserva del cliente YA NO usa este
-   * endpoint: se autentica por OTP (ver AuthModule) y el customerId sale
-   * del JWT, no de un teléfono sin verificar.
-   *
-   * Este endpoint sigue sin auth porque el dashboard admin todavía no
-   * tiene login propio (pendiente separado). Cuando se agregue, protegerlo
-   * con el guard de sesión de recepción/admin.
+   * dashboard-admin. El flujo de reserva del cliente NO usa este endpoint:
+   * se autentica por OTP (ver AuthModule) y el customerId sale del JWT.
    */
   @Post('upsert-by-phone')
+  @UseGuards(AdminAuthGuard)
   upsertByPhone(@Body() dto: UpsertCustomerDto) {
     return this.prisma.user.upsert({
       where: { phone: dto.phone },

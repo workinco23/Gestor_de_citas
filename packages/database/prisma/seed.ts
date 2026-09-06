@@ -1,13 +1,22 @@
 import { PrismaClient, ServiceCategory } from "@prisma/client";
+import { hashPassword } from "../index.js";
 
 const prisma = new PrismaClient();
 
 async function main() {
+  // --- Especialistas reales ---
+  // Por ahora el local solo cuenta con Leslye, con horario partido por almuerzo
+  // (12:30-13:30). Agregar más especialistas acá a medida que se contraten.
   const staffData = [
-    { displayName: "Bella", colorHex: "#2DD4BF", phone: "+51900000001" },
-    { displayName: "Angelie", colorHex: "#FB7185", phone: "+51900000002" },
-    { displayName: "Lesly", colorHex: "#FB923C", phone: "+51900000003" },
-    { displayName: "Nancy", colorHex: "#38BDF8", phone: "+51900000004" },
+    {
+      displayName: "Leslye",
+      colorHex: "#FB923C",
+      phone: "+51900000003",
+      shifts: [
+        { start: "09:00", end: "12:30" },
+        { start: "13:30", end: "18:00" },
+      ],
+    },
   ];
 
   const staffProfiles = [];
@@ -15,38 +24,28 @@ async function main() {
     const user = await prisma.user.upsert({
       where: { phone: s.phone },
       update: {},
-      create: {
-        phone: s.phone,
-        fullName: s.displayName,
-        role: "staff",
-      },
+      create: { phone: s.phone, fullName: s.displayName, role: "staff" },
     });
 
     const profile = await prisma.staffProfile.upsert({
       where: { userId: user.id },
-      update: {},
-      create: {
-        userId: user.id,
-        displayName: s.displayName,
-        colorHex: s.colorHex,
-      },
+      update: { displayName: s.displayName, active: true },
+      create: { userId: user.id, displayName: s.displayName, colorHex: s.colorHex },
     });
 
-    // Turno estándar L-S 09:00-18:00
+    await prisma.staffSchedule.deleteMany({ where: { staffId: profile.id } });
     for (let weekday = 1; weekday <= 6; weekday++) {
-      await prisma.staffSchedule.create({
-        data: {
-          staffId: profile.id,
-          weekday,
-          startTime: "09:00",
-          endTime: "18:00",
-        },
-      });
+      for (const shift of s.shifts) {
+        await prisma.staffSchedule.create({
+          data: { staffId: profile.id, weekday, startTime: shift.start, endTime: shift.end },
+        });
+      }
     }
 
     staffProfiles.push(profile);
   }
 
+  // --- Servicios ---
   const services = [
     { category: ServiceCategory.unas, name: "Manicura Gel", durationMinutes: 60, priceCents: 18000 },
     { category: ServiceCategory.unas, name: "Manicura Clásica", durationMinutes: 45, priceCents: 12000 },
@@ -56,22 +55,45 @@ async function main() {
     { category: ServiceCategory.cejas, name: "Laminado de Cejas", durationMinutes: 45, priceCents: 8000 },
   ];
 
-  const createdServices = [];
-  for (const svc of services) {
-    const created = await prisma.service.create({ data: svc });
-    createdServices.push(created);
+  const existingServices = await prisma.service.findMany();
+  const createdServices = existingServices.length > 0 ? existingServices : [];
+  if (existingServices.length === 0) {
+    for (const svc of services) {
+      createdServices.push(await prisma.service.create({ data: svc }));
+    }
   }
 
-  // Todas las especialistas pueden hacer todos los servicios (ajustar luego según habilidades reales)
   for (const staff of staffProfiles) {
     for (const svc of createdServices) {
-      await prisma.staffService.create({
-        data: { staffId: staff.id, serviceId: svc.id },
+      await prisma.staffService.upsert({
+        where: { staffId_serviceId: { staffId: staff.id, serviceId: svc.id } },
+        update: {},
+        create: { staffId: staff.id, serviceId: svc.id },
       });
     }
   }
 
-  console.log(`Seed completo: ${staffProfiles.length} especialistas, ${createdServices.length} servicios.`);
+  // --- Usuario de recepción (login del dashboard admin) ---
+  const receptionEmail = process.env.SEED_RECEPTION_EMAIL ?? "recepcion@aurorabeauty.pe";
+  const receptionPassword = process.env.SEED_RECEPTION_PASSWORD;
+  if (receptionPassword) {
+    await prisma.user.upsert({
+      where: { phone: "+51900000000" },
+      update: { email: receptionEmail, passwordHash: hashPassword(receptionPassword), role: "reception" },
+      create: {
+        phone: "+51900000000",
+        email: receptionEmail,
+        fullName: "Recepción",
+        role: "reception",
+        passwordHash: hashPassword(receptionPassword),
+      },
+    });
+    console.log(`Usuario de recepción listo: ${receptionEmail}`);
+  } else {
+    console.log("SEED_RECEPTION_PASSWORD no seteado: se omitió la creación/actualización del usuario de recepción.");
+  }
+
+  console.log(`Seed completo: ${staffProfiles.length} especialista(s), ${createdServices.length} servicio(s).`);
 }
 
 main()

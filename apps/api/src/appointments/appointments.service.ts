@@ -21,23 +21,30 @@ export class AppointmentsService {
    * Las reservas hechas desde la app del cliente ("app_cliente") deben venir
    * autenticadas por OTP: el customerId se toma del JWT, nunca del body, así
    * un cliente no puede reservar a nombre de otro. Las reservas manuales de
-   * recepción ("admin_manual") siguen tomando el customerId del body hasta
-   * que el dashboard admin tenga su propio login (pendiente aparte).
+   * recepción ("admin_manual") exigen un JWT de rol admin/reception (login
+   * del dashboard) y sí toman el customerId del body, ya que ahí el cliente
+   * todavía no tiene cuenta propia — recepción lo identifica por teléfono.
    */
   private async resolveCustomerId(dto: CreateAppointmentDto, authHeader?: string): Promise<string> {
+    const token = extractBearerToken(authHeader);
+    if (!token) throw new UnauthorizedException('Iniciá sesión para reservar una cita');
+
+    let payload: JwtPayload;
+    try {
+      payload = await this.jwt.verifyAsync<JwtPayload>(token);
+    } catch {
+      throw new UnauthorizedException('Sesión inválida o vencida, iniciá sesión de nuevo');
+    }
+
     if (dto.createdVia === 'admin_manual') {
+      if (!['admin', 'reception'].includes(payload.role)) {
+        throw new UnauthorizedException('No tenés permisos para registrar citas manuales');
+      }
       if (!dto.customerId) throw new UnauthorizedException('customerId es requerido para citas manuales');
       return dto.customerId;
     }
 
-    const token = extractBearerToken(authHeader);
-    if (!token) throw new UnauthorizedException('Iniciá sesión para reservar una cita');
-    try {
-      const payload = await this.jwt.verifyAsync<JwtPayload>(token);
-      return payload.sub;
-    } catch {
-      throw new UnauthorizedException('Sesión inválida o vencida, iniciá sesión de nuevo');
-    }
+    return payload.sub;
   }
 
   async findAll(params: { date?: string; staffId?: string }) {

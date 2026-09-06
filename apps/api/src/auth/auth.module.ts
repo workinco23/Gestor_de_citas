@@ -5,6 +5,7 @@ import { AuthService } from './auth.service.js';
 import { OtpService } from './otp.service.js';
 import { WhatsappService } from './whatsapp.service.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
+import { AdminAuthGuard } from './admin-auth.guard.js';
 
 @Module({
   imports: [
@@ -14,7 +15,7 @@ import { JwtAuthGuard } from './jwt-auth.guard.js';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, OtpService, WhatsappService, JwtAuthGuard],
-  exports: [JwtModule, JwtAuthGuard],
+  providers: [AuthService, OtpService, WhatsappService, JwtAuthGuard, AdminAuthGuard],
+  exports: [JwtModule, JwtAuthGuard, AdminAuthGuard],
 })
 export class AuthModule {}

@@ -57,6 +57,8 @@ model User {
   email     String?
   fullName  String   @map("full_name")
   role      UserRole @default(customer)
+  /// Solo para role=admin/reception. Los clientes se autentican por OTP, sin password.
+  passwordHash String? @map("password_hash")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
   staffProfile StaffProfile?
