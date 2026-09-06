@@ -80,11 +80,14 @@ La app cliente pide un código de 6 dígitos por WhatsApp (`POST /api/auth/otp/r
 
 `POST /api/appointments` con `createdVia: "app_cliente"` ahora exige el header `Authorization: Bearer <token>` — el `customerId` se toma del JWT, nunca del body. El endpoint `POST /api/customers/upsert-by-phone` sigue existiendo pero solo lo usa el panel admin (reservas manuales de recepción), no la app del cliente.
 
+### 7. Login del panel admin (recepción)
+
+Un solo usuario compartido (`POST /api/auth/admin/login`, JWT de 12h). Credenciales creadas por seed — pedirle al dueño del repo el usuario/contraseña vigente (se rota manualmente en Supabase, no está en este archivo). `GET/PATCH /api/appointments` y `POST /api/customers/upsert-by-phone` exigen ese token; `AdminAuthGuard` verifica que el JWT tenga `role: admin | reception` — un token de cliente (OTP) no sirve acá aunque esté vigente.
+
 ## Pendientes conocidos (antes de producción)
 
 - **Pagos (Culqi/Yape)**: solo existe el modelo `Payment` en el schema; falta la integración con la pasarela.
-- **Notificaciones WhatsApp (Twilio)**: no implementado todavía.
-- **Roles y permisos**: el dashboard no tiene login todavía; toda la agenda es de acceso libre en local.
+- **Notificaciones WhatsApp (Twilio)**: confirmaciones/recordatorios de cita, no implementado todavía (el envío de OTP sí usa Twilio/WhatsApp, ver sección 6).
 - **Íconos PWA**: `web-cliente/public/manifest.json` referencia `icon-192.png` e `icon-512.png` que aún no existen — agregar el logo real de la marca.
 
 ## Puertos
