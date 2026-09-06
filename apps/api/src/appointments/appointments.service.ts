@@ -1,7 +1,10 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AppointmentsGateway } from './appointments.gateway.js';
 import { SlotHoldsService } from '../availability/slot-holds.service.js';
+import { extractBearerToken } from '../auth/jwt-auth.guard.js';
+import type { JwtPayload } from '../auth/auth.service.js';
 import type { CreateAppointmentDto } from './dto/create-appointment.dto.js';
 import type { AppointmentStatus, PaymentStatus } from '@aurora/database';
 
@@ -11,7 +14,31 @@ export class AppointmentsService {
     private readonly prisma: PrismaService,
     private readonly gateway: AppointmentsGateway,
     private readonly slotHolds: SlotHoldsService,
+    private readonly jwt: JwtService,
   ) {}
+
+  /**
+   * Las reservas hechas desde la app del cliente ("app_cliente") deben venir
+   * autenticadas por OTP: el customerId se toma del JWT, nunca del body, así
+   * un cliente no puede reservar a nombre de otro. Las reservas manuales de
+   * recepción ("admin_manual") siguen tomando el customerId del body hasta
+   * que el dashboard admin tenga su propio login (pendiente aparte).
+   */
+  private async resolveCustomerId(dto: CreateAppointmentDto, authHeader?: string): Promise<string> {
+    if (dto.createdVia === 'admin_manual') {
+      if (!dto.customerId) throw new UnauthorizedException('customerId es requerido para citas manuales');
+      return dto.customerId;
+    }
+
+    const token = extractBearerToken(authHeader);
+    if (!token) throw new UnauthorizedException('Iniciá sesión para reservar una cita');
+    try {
+      const payload = await this.jwt.verifyAsync<JwtPayload>(token);
+      return payload.sub;
+    } catch {
+      throw new UnauthorizedException('Sesión inválida o vencida, iniciá sesión de nuevo');
+    }
+  }
 
   async findAll(params: { date?: string; staffId?: string }) {
     return this.prisma.appointment.findMany({
@@ -31,7 +58,9 @@ export class AppointmentsService {
     });
   }
 
-  async create(dto: CreateAppointmentDto) {
+  async create(dto: CreateAppointmentDto, authHeader?: string) {
+    const customerId = await this.resolveCustomerId(dto, authHeader);
+
     const services = await this.prisma.service.findMany({
       where: { id: { in: dto.serviceIds } },
     });
@@ -61,7 +90,7 @@ export class AppointmentsService {
 
       const appointment = await tx.appointment.create({
         data: {
-          customerId: dto.customerId,
+          customerId,
           staffId: dto.staffId,
           startsAt,
           endsAt,

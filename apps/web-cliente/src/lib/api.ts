@@ -76,16 +76,61 @@ export async function upsertCustomerByPhone(body: { phone: string; fullName: str
   return res.json();
 }
 
-export async function createAppointment(body: {
-  customerId: string;
-  staffId: string;
-  serviceIds: string[];
-  startsAt: string;
-  createdVia: "app_cliente";
-}) {
-  const res = await fetch(`${API_URL}/api/appointments`, {
+export interface AuthUser {
+  id: string;
+  phone: string;
+  fullName: string;
+  role: string;
+  email: string | null;
+  createdAt: string;
+}
+
+export async function requestOtp(body: { phone: string }): Promise<{ challengeId: string; devCode?: string }> {
+  const res = await fetch(`${API_URL}/api/auth/otp/request`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => null);
+    throw new Error(error?.message ?? "No se pudo enviar el código");
+  }
+  return res.json();
+}
+
+export async function verifyOtp(body: {
+  phone: string;
+  challengeId: string;
+  code: string;
+  fullName: string;
+}): Promise<{ token: string; user: AuthUser }> {
+  const res = await fetch(`${API_URL}/api/auth/otp/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => null);
+    throw new Error(error?.message ?? "No se pudo verificar el código");
+  }
+  return res.json();
+}
+
+export async function createAppointment(
+  body: {
+    staffId: string;
+    serviceIds: string[];
+    startsAt: string;
+    createdVia: "app_cliente";
+  },
+  token?: string,
+) {
+  const res = await fetch(`${API_URL}/api/appointments`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify(body),
   });
   if (!res.ok) {

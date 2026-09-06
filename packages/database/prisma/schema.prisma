@@ -65,6 +65,19 @@ model User {
   @@map("users")
 }
 
+model OtpChallenge {
+  id          String   @id @default(uuid())
+  phone       String
+  codeHash    String   @map("code_hash")
+  attempts    Int      @default(0)
+  consumedAt  DateTime? @map("consumed_at") @db.Timestamptz(3)
+  expiresAt   DateTime @map("expires_at") @db.Timestamptz(3)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([phone, createdAt])
+  @@map("otp_challenges")
+}
+
 model StaffProfile {
   id          String  @id @default(uuid())
   userId      String  @unique @map("user_id")

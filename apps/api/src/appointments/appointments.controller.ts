@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Patch, Post, Query } from '@nestjs/common';
 import { AppointmentsService } from './appointments.service.js';
 import { CreateAppointmentDto } from './dto/create-appointment.dto.js';
 import type { AppointmentStatus, PaymentStatus } from '@aurora/database';
@@ -13,8 +13,8 @@ export class AppointmentsController {
   }
 
   @Post()
-  create(@Body() dto: CreateAppointmentDto) {
-    return this.appointmentsService.create(dto);
+  create(@Body() dto: CreateAppointmentDto, @Headers('authorization') authHeader?: string) {
+    return this.appointmentsService.create(dto, authHeader);
   }
 
   @Patch(':id/status')

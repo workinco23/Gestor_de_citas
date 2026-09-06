@@ -7,9 +7,15 @@ export class CustomersController {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Placeholder de identificación por teléfono para el MVP, sin verificación.
-   * Reemplazar por autenticación real (OTP por SMS/WhatsApp) antes de producción:
-   * ver PRD_AuroraBeautyLounge.md sección 2.1.
+   * Usado únicamente por el panel admin (recepción registrando una cita
+   * manual por teléfono/WhatsApp/presencial) — ver QuickAppointmentForm en
+   * dashboard-admin. El flujo de reserva del cliente YA NO usa este
+   * endpoint: se autentica por OTP (ver AuthModule) y el customerId sale
+   * del JWT, no de un teléfono sin verificar.
+   *
+   * Este endpoint sigue sin auth porque el dashboard admin todavía no
+   * tiene login propio (pendiente separado). Cuando se agregue, protegerlo
+   * con el guard de sesión de recepción/admin.
    */
   @Post('upsert-by-phone')
   upsertByPhone(@Body() dto: UpsertCustomerDto) {
