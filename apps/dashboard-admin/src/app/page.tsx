@@ -15,13 +15,43 @@ import {
   formatTimeLima,
   todayLima,
   updateAppointmentStatus,
+  updateAppointmentPaymentStatus,
   type AppointmentDTO,
+  type PaymentMethod,
+  type PaymentStatus,
   type ServiceDTO,
   type StaffDTO,
 } from "@/lib/api";
 import { clearSession, loadSession, type AdminSession } from "@/lib/session";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3103";
+
+const PAYMENT_STATUS_LABEL: Record<PaymentStatus, string> = {
+  unpaid: "Sin pagar",
+  partial: "Adelanto pendiente",
+  paid: "Pagado",
+};
+
+const PAYMENT_STATUS_CLASS: Record<PaymentStatus, string> = {
+  unpaid: "bg-gray-100 text-gray-500",
+  partial: "bg-amber-100 text-amber-700",
+  paid: "bg-green-100 text-green-700",
+};
+
+const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
+  cash: "Efectivo",
+  yape: "Yape",
+  plin: "Plin",
+  card: "Tarjeta",
+};
+
+function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${PAYMENT_STATUS_CLASS[status]}`}>
+      {PAYMENT_STATUS_LABEL[status]}
+    </span>
+  );
+}
 
 export default function DashboardPage() {
   const [checkingSession, setCheckingSession] = useState(true);
@@ -33,6 +63,7 @@ export default function DashboardPage() {
   const [services, setServices] = useState<ServiceDTO[]>([]);
   const [appointments, setAppointments] = useState<AppointmentDTO[]>([]);
   const [selected, setSelected] = useState<AppointmentDTO | null>(null);
+  const [updatingPayment, setUpdatingPayment] = useState(false);
 
   useEffect(() => {
     setSession(loadSession());
@@ -94,6 +125,20 @@ export default function DashboardPage() {
     );
   }
 
+  function handleMarkAsPaid() {
+    if (!selected || !session) return;
+    setUpdatingPayment(true);
+    updateAppointmentPaymentStatus(selected.id, "paid", session.token)
+      .then((updated) => {
+        setSelected(updated);
+        reload();
+      })
+      .catch((e) => {
+        if (e instanceof ApiError && e.status === 401) handleExpiredSession();
+      })
+      .finally(() => setUpdatingPayment(false));
+  }
+
   function handleLogout() {
     clearSession();
     setSession(null);
@@ -136,9 +181,12 @@ export default function DashboardPage() {
                     </div>
                     <p className="text-gray-400">{a.services.map((s) => s.service.name).join(", ")}</p>
                     <div className="mt-1 flex items-center justify-between">
-                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] uppercase text-gray-500">
-                        {a.status}
-                      </span>
+                      <div className="flex items-center gap-1">
+                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] uppercase text-gray-500">
+                          {a.status}
+                        </span>
+                        <PaymentStatusBadge status={a.paymentStatus} />
+                      </div>
                       {a.status !== "cancelled" && a.status !== "completed" && (
                         <button
                           onClick={() =>
@@ -189,6 +237,33 @@ export default function DashboardPage() {
                 </li>
               ))}
             </ul>
+
+            <div className="mt-4 rounded-lg border border-gray-100 p-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-semibold uppercase text-gray-500">Pago</h4>
+                <PaymentStatusBadge status={selected.paymentStatus} />
+              </div>
+              {selected.payments.length > 0 && (
+                <ul className="mt-2 flex flex-col gap-1 text-xs text-gray-500">
+                  {selected.payments.map((p) => (
+                    <li key={p.id}>
+                      {PAYMENT_METHOD_LABEL[p.method]} · {formatSoles(p.amountCents)}
+                      {p.providerReference && <> · Nº de operación: {p.providerReference}</>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {selected.paymentStatus !== "paid" && (
+                <button
+                  onClick={handleMarkAsPaid}
+                  disabled={updatingPayment}
+                  className="mt-3 w-full rounded-md bg-burdeos py-1.5 text-xs font-semibold text-white disabled:opacity-40"
+                >
+                  {updatingPayment ? "Guardando…" : "Marcar como pagado"}
+                </button>
+              )}
+            </div>
+
             <button
               onClick={() => setSelected(null)}
               className="mt-4 w-full rounded-md bg-gray-100 py-2 text-sm text-gray-600"

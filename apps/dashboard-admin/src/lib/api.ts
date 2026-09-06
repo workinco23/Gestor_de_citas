@@ -17,6 +17,15 @@ export interface StaffDTO {
 
 export type AppointmentStatus = "pending" | "confirmed" | "completed" | "cancelled" | "no_show";
 export type PaymentStatus = "unpaid" | "partial" | "paid";
+export type PaymentMethod = "cash" | "yape" | "plin" | "card";
+
+export interface PaymentDTO {
+  id: string;
+  amountCents: number;
+  method: PaymentMethod;
+  providerReference: string | null;
+  paidAt: string;
+}
 
 export interface AppointmentDTO {
   id: string;
@@ -29,6 +38,7 @@ export interface AppointmentDTO {
   customer: { id: string; fullName: string; phone: string };
   staff: StaffDTO;
   services: { service: ServiceDTO }[];
+  payments: PaymentDTO[];
 }
 
 export interface AvailabilitySlot {
@@ -116,6 +126,13 @@ export const updateAppointmentStatus = (id: string, status: AppointmentStatus, t
     method: "PATCH",
     headers: { "Content-Type": "application/json", ...authHeaders(token) },
     body: JSON.stringify({ status }),
+  }).then((r) => json<AppointmentDTO>(r));
+
+export const updateAppointmentPaymentStatus = (id: string, paymentStatus: PaymentStatus, token?: string) =>
+  fetch(`${API_URL}/api/appointments/${id}/payment-status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders(token) },
+    body: JSON.stringify({ paymentStatus }),
   }).then((r) => json<AppointmentDTO>(r));
 
 export function formatSoles(cents: number): string {
