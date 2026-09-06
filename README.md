@@ -84,11 +84,18 @@ La app cliente pide un código de 6 dígitos por WhatsApp (`POST /api/auth/otp/r
 
 Un solo usuario compartido (`POST /api/auth/admin/login`, JWT de 12h). Credenciales creadas por seed — pedirle al dueño del repo el usuario/contraseña vigente (se rota manualmente en Supabase, no está en este archivo). `GET/PATCH /api/appointments` y `POST /api/customers/upsert-by-phone` exigen ese token; `AdminAuthGuard` verifica que el JWT tenga `role: admin | reception` — un token de cliente (OTP) no sirve acá aunque esté vigente.
 
+### 8. Pagos (Yape/Plin manuales, sin pasarela) y notificaciones de WhatsApp
+
+Decisión del negocio: nada de Culqi/Stripe. `GET /api/payment-info` (público) expone el número real de Yape/Plin del local y el monto de adelanto (`PAYMENT_YAPE_PLIN_PHONE`, `PAYMENT_YAPE_PLIN_HOLDER`, `PAYMENT_DEPOSIT_CENTS` en `.env`). El cliente declara en la reserva que va a transferir (o ya transfirió) ese adelanto; el backend crea el `Payment` y marca `paymentStatus: "partial"`, pero **nadie valida automáticamente que la plata llegó** — recepción lo confirma a mano desde el dashboard ("Marcar como pagado") al ver el depósito en su Yape/Plin.
+
+WhatsApp (vía `WhatsappService`, mismo mecanismo de modo desarrollo que el OTP — ver sección 6) ahora también manda: confirmación al reservar (con instrucciones de pago si quedó "unpaid"), aviso si se cancela la cita, y recordatorios automáticos 24h y 2h antes vía un cron interno (`RemindersService`, `@nestjs/schedule`, corre cada 10 min). Los recordatorios no se duplican (`reminder24hSentAt`/`reminder2hSentAt` en `Appointment`).
+
+**Importante:** `apps/api/src/main.ts` carga `.env` de forma explícita con `process.loadEnvFile()` antes de importar `AppModule` — si se agrega una variable de entorno nueva, alcanza con reiniciar la API para que se vea (no hace falta ningún paso extra), pero si algún día se rompe esto de nuevo, empezar a debuggear por ahí.
+
 ## Pendientes conocidos (antes de producción)
 
-- **Pagos (Culqi/Yape)**: solo existe el modelo `Payment` en el schema; falta la integración con la pasarela.
-- **Notificaciones WhatsApp (Twilio)**: confirmaciones/recordatorios de cita, no implementado todavía (el envío de OTP sí usa Twilio/WhatsApp, ver sección 6).
 - **Íconos PWA**: `web-cliente/public/manifest.json` referencia `icon-192.png` e `icon-512.png` que aún no existen — agregar el logo real de la marca.
+- **Sin pasarela de pago real**: si en algún momento el negocio quiere cobrar Yape automático (validado al instante, no manual), Culqi sí tiene API documentada para eso — ver PRD sección 3.3. Hoy es 100% manual a propósito (decisión del dueño).
 
 ## Puertos
 
