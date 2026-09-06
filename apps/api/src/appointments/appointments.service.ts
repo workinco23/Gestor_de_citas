@@ -5,10 +5,10 @@ import { AppointmentsGateway } from './appointments.gateway.js';
 import { SlotHoldsService } from '../availability/slot-holds.service.js';
 import { extractBearerToken } from '../auth/jwt-auth.guard.js';
 import { WhatsappService } from '../notifications/whatsapp.service.js';
-import { cancellationMessage, confirmationMessage, paymentInstructionsNote } from '../notifications/templates.js';
+import { cancellationMessage, confirmationMessage, paymentReminderNote } from '../notifications/templates.js';
 import type { JwtPayload } from '../auth/auth.service.js';
 import type { CreateAppointmentDto } from './dto/create-appointment.dto.js';
-import type { AppointmentStatus, PaymentStatus } from '@aurora/database';
+import type { AppointmentStatus, PaymentMethod, PaymentStatus } from '@aurora/database';
 
 const APPOINTMENT_INCLUDE = {
   services: { include: { service: true } },
@@ -88,9 +88,6 @@ export class AppointmentsService {
     const startsAt = new Date(dto.startsAt);
     const endsAt = new Date(startsAt.getTime() + totalDurationMinutes * 60_000);
 
-    const depositCents = Number(process.env.PAYMENT_DEPOSIT_CENTS ?? 2000);
-    const hasDeclaredDeposit = dto.paymentMethod === 'yape' || dto.paymentMethod === 'plin';
-
     // Revalidación de disponibilidad dentro de la transacción para cerrar la
     // ventana de condición de carrera entre GET /availability y este POST.
     // La defensa final (a nivel de BD) es el EXCLUDE constraint descrito en
@@ -116,27 +113,16 @@ export class AppointmentsService {
           endsAt,
           notes: dto.notes,
           createdVia: dto.createdVia,
-          // El cliente declara que envió el adelanto; recepción lo confirma
-          // manualmente en el dashboard al ver que llegó la plata (no hay
-          // pasarela: ver PaymentInfoController y el pendiente de "Pagos").
-          paymentStatus: hasDeclaredDeposit ? 'partial' : 'unpaid',
+          // Período de prueba: sin adelanto. Solo guardamos la preferencia
+          // para que recepción/la especialista sepan qué esperar al cobrar
+          // en persona — no crea ningún Payment ni cambia paymentStatus.
+          intendedPaymentMethod: dto.paymentMethod ?? null,
           services: {
             create: services.map((s) => ({
               serviceId: s.id,
               priceCentsAtBooking: s.priceCents,
             })),
           },
-          ...(hasDeclaredDeposit
-            ? {
-                payments: {
-                  create: {
-                    amountCents: depositCents,
-                    method: dto.paymentMethod as 'yape' | 'plin',
-                    providerReference: dto.paymentReference || null,
-                  },
-                },
-              }
-            : {}),
         },
         include: APPOINTMENT_INCLUDE,
       });
@@ -147,15 +133,10 @@ export class AppointmentsService {
 
     this.gateway.emitAppointmentCreated(appointment);
 
-    const paymentNote =
-      appointment.paymentStatus === 'unpaid'
-        ? paymentInstructionsNote(
-            (depositCents / 100).toFixed(0),
-            process.env.PAYMENT_YAPE_PLIN_PHONE ?? '',
-            process.env.PAYMENT_YAPE_PLIN_HOLDER ?? '',
-          )
-        : 'Recibimos tu aviso de adelanto — lo vamos a confirmar antes de tu cita. ¡Gracias!';
-    void this.whatsapp.sendMessage(appointment.customer.phone, confirmationMessage(appointment, paymentNote));
+    void this.whatsapp.sendMessage(
+      appointment.customer.phone,
+      confirmationMessage(appointment, paymentReminderNote(appointment.intendedPaymentMethod)),
+    );
 
     return appointment;
   }
@@ -175,12 +156,38 @@ export class AppointmentsService {
     return appointment;
   }
 
-  async updatePaymentStatus(id: string, paymentStatus: PaymentStatus) {
-    const appointment = await this.prisma.appointment.update({
-      where: { id },
-      data: { paymentStatus },
-      include: APPOINTMENT_INCLUDE,
+  /**
+   * Al marcar una cita como pagada, recepción confirma con qué método cobró
+   * en persona (puede diferir de intendedPaymentMethod). Crea el Payment
+   * real recién acá — antes de esto no existe ningún registro de pago,
+   * porque durante el período de prueba no se cobra adelanto.
+   */
+  async updatePaymentStatus(id: string, paymentStatus: PaymentStatus, method?: PaymentMethod) {
+    const appointment = await this.prisma.$transaction(async (tx) => {
+      if (paymentStatus === 'paid') {
+        const existing = await tx.appointment.findUniqueOrThrow({
+          where: { id },
+          include: { services: true, payments: true },
+        });
+        if (existing.payments.length === 0) {
+          const totalCents = existing.services.reduce((sum, s) => sum + s.priceCentsAtBooking, 0);
+          await tx.payment.create({
+            data: {
+              appointmentId: id,
+              amountCents: totalCents,
+              method: method ?? existing.intendedPaymentMethod ?? 'cash',
+            },
+          });
+        }
+      }
+
+      return tx.appointment.update({
+        where: { id },
+        data: { paymentStatus },
+        include: APPOINTMENT_INCLUDE,
+      });
     });
+
     this.gateway.emitAppointmentUpdated(appointment);
     return appointment;
   }

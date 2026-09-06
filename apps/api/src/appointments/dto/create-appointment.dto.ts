@@ -29,16 +29,12 @@ export class CreateAppointmentDto {
   createdVia!: 'app_cliente' | 'admin_manual';
 
   /**
-   * Sin pasarela de pago: si el cliente elige "yape" o "plin", declara que ya
-   * envió (o va a enviar) el adelanto al número del local — recepción lo
-   * confirma manualmente viendo que llegó la plata. "cash" o ausente = paga
-   * en el local, sin acción inmediata sobre el estado de pago.
+   * Cómo dice el cliente que va a pagar cuando llegue a la cita. Durante el
+   * período de prueba NO se cobra ningún adelanto: esto es solo una
+   * preferencia informativa para que recepción/la especialista sepan qué
+   * esperar, no crea ningún registro de pago ni cambia paymentStatus.
    */
   @IsOptional()
   @IsIn(['cash', 'yape', 'plin'])
   paymentMethod?: 'cash' | 'yape' | 'plin';
-
-  @IsOptional()
-  @IsString()
-  paymentReference?: string;
 }

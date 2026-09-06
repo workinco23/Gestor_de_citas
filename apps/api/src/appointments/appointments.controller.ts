@@ -2,7 +2,7 @@ import { Body, Controller, Get, Headers, Param, Patch, Post, Query, UseGuards } 
 import { AppointmentsService } from './appointments.service.js';
 import { CreateAppointmentDto } from './dto/create-appointment.dto.js';
 import { AdminAuthGuard } from '../auth/admin-auth.guard.js';
-import type { AppointmentStatus, PaymentStatus } from '@aurora/database';
+import type { AppointmentStatus, PaymentMethod, PaymentStatus } from '@aurora/database';
 
 @Controller('appointments')
 export class AppointmentsController {
@@ -30,7 +30,11 @@ export class AppointmentsController {
 
   @Patch(':id/payment-status')
   @UseGuards(AdminAuthGuard)
-  updatePaymentStatus(@Param('id') id: string, @Body('paymentStatus') paymentStatus: PaymentStatus) {
-    return this.appointmentsService.updatePaymentStatus(id, paymentStatus);
+  updatePaymentStatus(
+    @Param('id') id: string,
+    @Body('paymentStatus') paymentStatus: PaymentStatus,
+    @Body('method') method?: PaymentMethod,
+  ) {
+    return this.appointmentsService.updatePaymentStatus(id, paymentStatus, method);
   }
 }

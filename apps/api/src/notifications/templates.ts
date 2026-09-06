@@ -50,9 +50,14 @@ export function reminder2hMessage(appt: AppointmentForMessage): string {
   );
 }
 
-export function paymentInstructionsNote(depositSoles: string, phone: string, holderName: string): string {
-  return (
-    `Para asegurar tu cita, podés adelantar S/ ${depositSoles} por Yape o Plin al número ${phone} ` +
-    `(a nombre de ${holderName}) y avisarnos por acá, o pagar el total en el local.`
-  );
+/**
+ * Durante el período de prueba no se cobra adelanto — este mensaje solo
+ * recuerda cómo dijo el cliente que iba a pagar, no pide ninguna acción.
+ */
+export function paymentReminderNote(intendedPaymentMethod: 'cash' | 'yape' | 'plin' | 'card' | null): string {
+  if (intendedPaymentMethod === 'yape' || intendedPaymentMethod === 'plin') {
+    const method = intendedPaymentMethod === 'yape' ? 'Yape' : 'Plin';
+    return `Recordá tener listo tu pago por ${method} al momento de la cita.`;
+  }
+  return 'Pagás en el local al finalizar tu cita.';
 }
