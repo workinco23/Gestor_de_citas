@@ -5,6 +5,7 @@ import { AuthService } from './auth.service.js';
 import { OtpService } from './otp.service.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
 import { AdminAuthGuard } from './admin-auth.guard.js';
+import { StaffOrAdminAuthGuard } from './staff-or-admin-auth.guard.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
 
 @Module({
@@ -16,7 +17,7 @@ import { NotificationsModule } from '../notifications/notifications.module.js';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, OtpService, JwtAuthGuard, AdminAuthGuard],
-  exports: [JwtModule, JwtAuthGuard, AdminAuthGuard],
+  providers: [AuthService, OtpService, JwtAuthGuard, AdminAuthGuard, StaffOrAdminAuthGuard],
+  exports: [JwtModule, JwtAuthGuard, AdminAuthGuard, StaffOrAdminAuthGuard],
 })
 export class AuthModule {}

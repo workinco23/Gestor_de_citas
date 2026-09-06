@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AppointmentsGateway } from './appointments.gateway.js';
@@ -57,22 +57,45 @@ export class AppointmentsService {
     return payload.sub;
   }
 
-  async findAll(params: { date?: string; staffId?: string }) {
+  async findAll(params: { date?: string; from?: string; to?: string; staffId?: string }) {
+    let dateFilter = {};
+    if (params.from && params.to) {
+      dateFilter = {
+        startsAt: {
+          gte: new Date(`${params.from}T00:00:00.000Z`),
+          lt: new Date(`${params.to}T23:59:59.999Z`),
+        },
+      };
+    } else if (params.date) {
+      dateFilter = {
+        startsAt: {
+          gte: new Date(`${params.date}T00:00:00.000Z`),
+          lt: new Date(`${params.date}T23:59:59.999Z`),
+        },
+      };
+    }
+
     return this.prisma.appointment.findMany({
       where: {
         ...(params.staffId ? { staffId: params.staffId } : {}),
-        ...(params.date
-          ? {
-              startsAt: {
-                gte: new Date(`${params.date}T00:00:00.000Z`),
-                lt: new Date(`${params.date}T23:59:59.999Z`),
-              },
-            }
-          : {}),
+        ...dateFilter,
       },
       include: APPOINTMENT_INCLUDE,
       orderBy: { startsAt: 'asc' },
     });
+  }
+
+  /** Usado por StaffOrAdminAuthGuard: una especialista solo puede tocar sus propias citas. */
+  async assertStaffOwnsAppointment(appointmentId: string, staffProfileId?: string): Promise<void> {
+    if (!staffProfileId) throw new ForbiddenException('Tu cuenta no tiene un perfil de especialista asociado');
+    const appointment = await this.prisma.appointment.findUnique({
+      where: { id: appointmentId },
+      select: { staffId: true },
+    });
+    if (!appointment) throw new NotFoundException('Cita no encontrada');
+    if (appointment.staffId !== staffProfileId) {
+      throw new ForbiddenException('No podés modificar citas de otra especialista');
+    }
   }
 
   async create(dto: CreateAppointmentDto, authHeader?: string) {

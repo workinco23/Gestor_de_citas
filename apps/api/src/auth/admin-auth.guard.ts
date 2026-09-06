@@ -1,12 +1,7 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { extractBearerToken } from './jwt-auth.guard.js';
-import type { JwtPayload } from './auth.service.js';
-
-interface RequestWithUser {
-  headers: { authorization?: string };
-  user?: JwtPayload;
-}
+import { verifyRole } from './verify-role.js';
+import type { RequestWithUser } from './request-with-user.js';
 
 const ADMIN_ROLES = ['admin', 'reception'];
 
@@ -17,20 +12,7 @@ export class AdminAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<RequestWithUser>();
-    const token = extractBearerToken(request.headers.authorization);
-    if (!token) throw new UnauthorizedException('Iniciá sesión para acceder al panel');
-
-    let payload: JwtPayload;
-    try {
-      payload = await this.jwt.verifyAsync<JwtPayload>(token);
-    } catch {
-      throw new UnauthorizedException('Sesión inválida o vencida, iniciá sesión de nuevo');
-    }
-
-    if (!ADMIN_ROLES.includes(payload.role)) {
-      throw new UnauthorizedException('No tenés permisos para esta acción');
-    }
-    request.user = payload;
+    request.user = await verifyRole(this.jwt, request.headers.authorization, ADMIN_ROLES);
     return true;
   }
 }

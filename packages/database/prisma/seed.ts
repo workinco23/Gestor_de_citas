@@ -73,6 +73,23 @@ async function main() {
     }
   }
 
+  // --- Login de cada especialista (ej. Leslye ve su propia agenda semanal) ---
+  const staffLogins: Record<string, { email: string; envVar: string }> = {
+    "+51900000003": { email: "leslye@aurorabeauty.pe", envVar: "SEED_LESLYE_PASSWORD" },
+  };
+  for (const [phone, { email, envVar }] of Object.entries(staffLogins)) {
+    const password = process.env[envVar];
+    if (!password) {
+      console.log(`${envVar} no seteado: se omitió el login de ${email}.`);
+      continue;
+    }
+    await prisma.user.update({
+      where: { phone },
+      data: { email, passwordHash: hashPassword(password) },
+    });
+    console.log(`Login de especialista listo: ${email}`);
+  }
+
   // --- Usuario de recepción (login del dashboard admin) ---
   const receptionEmail = process.env.SEED_RECEPTION_EMAIL ?? "recepcion@aurorabeauty.pe";
   const receptionPassword = process.env.SEED_RECEPTION_PASSWORD;
