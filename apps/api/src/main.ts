@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import path from 'node:path';
+import { getAllowedOrigins } from './cors.js';
 
 // Carga apps/api/.env de forma explícita y ANTES de importar AppModule: los
 // providers (JwtModule.register, WhatsappService, etc.) leen process.env al
@@ -20,12 +21,7 @@ const { AppModule } = await import('./app.module.js');
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  app.enableCors({
-    origin: [
-      'http://localhost:3101', // web-cliente
-      'http://localhost:3102', // dashboard-admin
-    ],
-  });
+  app.enableCors({ origin: getAllowedOrigins() });
   app.setGlobalPrefix('api');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   await app.listen(process.env.PORT ?? 3103);

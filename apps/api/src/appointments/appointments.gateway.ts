@@ -1,5 +1,6 @@
 import { WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import type { Server } from 'socket.io';
+import { getAllowedOrigins } from '../cors.js';
 
 /**
  * Notifica en tiempo real al dashboard admin y a otros clientes navegando
@@ -8,7 +9,7 @@ import type { Server } from 'socket.io';
  */
 @WebSocketGateway({
   cors: {
-    origin: ['http://localhost:3101', 'http://localhost:3102'],
+    origin: getAllowedOrigins(),
   },
 })
 export class AppointmentsGateway {

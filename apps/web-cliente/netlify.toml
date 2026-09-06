@@ -1,0 +1,6 @@
+# Sitio de Netlify para esta app: en la configuración del sitio (Site settings
+# → Build & deploy → Build settings) hay que setear "Base directory" a
+# "apps/web-cliente" — este archivo ya queda relativo a esa carpeta.
+[build]
+  command = "npm run build"
+  publish = ".next"
