@@ -116,18 +116,6 @@ export async function verifyOtp(body: {
   return res.json();
 }
 
-export interface PaymentInfoDTO {
-  phone: string;
-  holderName: string;
-  depositCents: number;
-}
-
-export async function fetchPaymentInfo(): Promise<PaymentInfoDTO> {
-  const res = await fetch(`${API_URL}/api/payment-info`);
-  if (!res.ok) throw new Error("No se pudo cargar la información de pago");
-  return res.json();
-}
-
 export async function createAppointment(
   body: {
     staffId: string;
@@ -135,7 +123,6 @@ export async function createAppointment(
     startsAt: string;
     createdVia: "app_cliente";
     paymentMethod?: "cash" | "yape" | "plin";
-    paymentReference?: string;
   },
   token?: string,
 ) {

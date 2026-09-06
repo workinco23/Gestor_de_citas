@@ -5,7 +5,6 @@ import { Calendar } from "@/components/Calendar";
 import {
   createAppointment,
   fetchAvailability,
-  fetchPaymentInfo,
   fetchServices,
   fetchStaff,
   formatSoles,
@@ -15,7 +14,6 @@ import {
   verifyOtp,
   type AuthUser,
   type AvailabilitySlot,
-  type PaymentInfoDTO,
   type ServiceDTO,
   type StaffDTO,
 } from "@/lib/api";
@@ -81,9 +79,7 @@ export default function Home() {
   const [confirmed, setConfirmed] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const [paymentInfo, setPaymentInfo] = useState<PaymentInfoDTO | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "yape" | "plin">("cash");
-  const [paymentReference, setPaymentReference] = useState("");
 
   const [session, setSession] = useState<ClientSession | null>(null);
   const [challengeId, setChallengeId] = useState<string | null>(null);
@@ -96,7 +92,6 @@ export default function Home() {
   useEffect(() => {
     fetchServices().then(setServices).catch(() => setErrorMsg("No se pudo conectar con el servidor."));
     fetchStaff().then(setStaff).catch(() => {});
-    fetchPaymentInfo().then(setPaymentInfo).catch(() => {});
     setSession(loadSession());
   }, []);
 
@@ -194,7 +189,6 @@ export default function Home() {
           startsAt: selectedSlot.startsAt,
           createdVia: "app_cliente",
           paymentMethod,
-          paymentReference: paymentReference.trim() || undefined,
         },
         session.token,
       );
@@ -211,16 +205,12 @@ export default function Home() {
       <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-4 p-6 text-center">
         <div className="text-5xl">✓</div>
         <h1 className="text-xl font-semibold text-gray-800">¡Cita reservada!</h1>
-        {paymentMethod !== "cash" ? (
-          <p className="text-gray-500">
-            Recibimos tu aviso de adelanto por {paymentMethod === "yape" ? "Yape" : "Plin"}. Recepción lo va a
-            confirmar antes de tu cita. Te enviaremos la confirmación y un recordatorio por WhatsApp.
-          </p>
-        ) : (
-          <p className="text-gray-500">
-            Te enviaremos la confirmación y un recordatorio por WhatsApp antes de tu cita.
-          </p>
-        )}
+        <p className="text-gray-500">
+          {paymentMethod !== "cash"
+            ? `Recordá tener listo tu pago por ${paymentMethod === "yape" ? "Yape" : "Plin"} el día de tu cita.`
+            : "Pagás en el local al finalizar tu cita."}{" "}
+          Te enviaremos la confirmación y un recordatorio por WhatsApp.
+        </p>
       </main>
     );
   }
@@ -495,11 +485,14 @@ export default function Home() {
           </div>
 
           <div>
-            <h2 className="mb-2 text-sm font-semibold text-gray-500">Método de pago</h2>
+            <h2 className="mb-2 text-sm font-semibold text-gray-500">¿Cómo vas a pagar?</h2>
+            <p className="mb-2 text-xs text-gray-400">
+              Pagás al finalizar tu cita — esto es solo para que sepamos qué esperar.
+            </p>
             <div className="flex flex-wrap gap-2">
               {(
                 [
-                  { key: "cash", label: "Pago en el local" },
+                  { key: "cash", label: "Efectivo" },
                   { key: "yape", label: "Yape" },
                   { key: "plin", label: "Plin" },
                 ] as const
@@ -518,23 +511,6 @@ export default function Home() {
                 </button>
               ))}
             </div>
-
-            {(paymentMethod === "yape" || paymentMethod === "plin") && paymentInfo && (
-              <div className="mt-3 flex flex-col gap-3 rounded-xl border border-burdeos/30 bg-burdeos/5 p-3 text-sm text-gray-700">
-                <p>
-                  Envíanos {formatSoles(paymentInfo.depositCents)} por{" "}
-                  {paymentMethod === "yape" ? "Yape" : "Plin"} al{" "}
-                  <span className="font-semibold text-gray-800">{paymentInfo.phone}</span> (a nombre de{" "}
-                  {paymentInfo.holderName}) para asegurar tu cita.
-                </p>
-                <input
-                  value={paymentReference}
-                  onChange={(e) => setPaymentReference(e.target.value)}
-                  placeholder="Nº de operación (opcional)"
-                  className="rounded-lg border border-gray-200 px-4 py-2 text-sm"
-                />
-              </div>
-            )}
           </div>
 
           <button

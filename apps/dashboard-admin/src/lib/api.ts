@@ -39,6 +39,7 @@ export interface AppointmentDTO {
   staff: StaffDTO;
   services: { service: ServiceDTO }[];
   payments: PaymentDTO[];
+  intendedPaymentMethod: PaymentMethod | null;
 }
 
 export interface AvailabilitySlot {
@@ -128,11 +129,16 @@ export const updateAppointmentStatus = (id: string, status: AppointmentStatus, t
     body: JSON.stringify({ status }),
   }).then((r) => json<AppointmentDTO>(r));
 
-export const updateAppointmentPaymentStatus = (id: string, paymentStatus: PaymentStatus, token?: string) =>
+export const updateAppointmentPaymentStatus = (
+  id: string,
+  paymentStatus: PaymentStatus,
+  token?: string,
+  method?: PaymentMethod,
+) =>
   fetch(`${API_URL}/api/appointments/${id}/payment-status`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", ...authHeaders(token) },
-    body: JSON.stringify({ paymentStatus }),
+    body: JSON.stringify({ paymentStatus, method }),
   }).then((r) => json<AppointmentDTO>(r));
 
 export function formatSoles(cents: number): string {

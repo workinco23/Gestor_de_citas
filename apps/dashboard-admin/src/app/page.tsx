@@ -64,6 +64,11 @@ export default function DashboardPage() {
   const [appointments, setAppointments] = useState<AppointmentDTO[]>([]);
   const [selected, setSelected] = useState<AppointmentDTO | null>(null);
   const [updatingPayment, setUpdatingPayment] = useState(false);
+  const [paidMethod, setPaidMethod] = useState<PaymentMethod>("cash");
+
+  useEffect(() => {
+    if (selected) setPaidMethod(selected.intendedPaymentMethod ?? "cash");
+  }, [selected]);
 
   useEffect(() => {
     setSession(loadSession());
@@ -128,7 +133,7 @@ export default function DashboardPage() {
   function handleMarkAsPaid() {
     if (!selected || !session) return;
     setUpdatingPayment(true);
-    updateAppointmentPaymentStatus(selected.id, "paid", session.token)
+    updateAppointmentPaymentStatus(selected.id, "paid", session.token, paidMethod)
       .then((updated) => {
         setSelected(updated);
         reload();
@@ -243,6 +248,15 @@ export default function DashboardPage() {
                 <h4 className="text-xs font-semibold uppercase text-gray-500">Pago</h4>
                 <PaymentStatusBadge status={selected.paymentStatus} />
               </div>
+              {selected.intendedPaymentMethod && selected.paymentStatus !== "paid" && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Dijo que iba a pagar con{" "}
+                  <span className="font-medium text-gray-700">
+                    {PAYMENT_METHOD_LABEL[selected.intendedPaymentMethod]}
+                  </span>
+                  . Sin adelanto — cobrar en persona.
+                </p>
+              )}
               {selected.payments.length > 0 && (
                 <ul className="mt-2 flex flex-col gap-1 text-xs text-gray-500">
                   {selected.payments.map((p) => (
@@ -254,13 +268,25 @@ export default function DashboardPage() {
                 </ul>
               )}
               {selected.paymentStatus !== "paid" && (
-                <button
-                  onClick={handleMarkAsPaid}
-                  disabled={updatingPayment}
-                  className="mt-3 w-full rounded-md bg-burdeos py-1.5 text-xs font-semibold text-white disabled:opacity-40"
-                >
-                  {updatingPayment ? "Guardando…" : "Marcar como pagado"}
-                </button>
+                <div className="mt-3 flex items-center gap-2">
+                  <select
+                    value={paidMethod}
+                    onChange={(e) => setPaidMethod(e.target.value as PaymentMethod)}
+                    className="flex-1 rounded-md border border-gray-200 px-2 py-1.5 text-xs"
+                  >
+                    <option value="cash">Efectivo</option>
+                    <option value="yape">Yape</option>
+                    <option value="plin">Plin</option>
+                    <option value="card">Tarjeta</option>
+                  </select>
+                  <button
+                    onClick={handleMarkAsPaid}
+                    disabled={updatingPayment}
+                    className="rounded-md bg-burdeos px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
+                  >
+                    {updatingPayment ? "Guardando…" : "Marcar pagado"}
+                  </button>
+                </div>
               )}
             </div>
 
